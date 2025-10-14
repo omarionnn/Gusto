@@ -243,11 +243,8 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     console.log(`🔄 Closing browser and ending session...`);
     await endSession(browserbaseSessionId, browser);
 
-    // Wait for recording to be available (Browserbase needs time to process)
-    console.log(`⏳ Waiting for session recording to be available...`);
-    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-
-    // Generate report with recording URL
+    // Generate report with recording URL (includes retry logic)
+    console.log(`⏳ Fetching session recording URL...`);
     const report = await generateReport(testId, actionLogs, browserbaseSessionId);
 
     // Update status to completed

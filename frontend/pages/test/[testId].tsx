@@ -26,8 +26,15 @@ export default function TestView() {
         setTestData(status);
         setLoading(false);
 
-        // Stop polling if test is completed, failed, or stopped
-        if (status.status === 'completed' || status.status === 'failed' || status.status === 'stopped') {
+        // Stop polling only if:
+        // 1. Test is completed AND recording URL is available, OR
+        // 2. Test is failed or stopped
+        const shouldStopPolling =
+          (status.status === 'completed' && status.recordingUrl) ||
+          status.status === 'failed' ||
+          status.status === 'stopped';
+
+        if (shouldStopPolling) {
           clearInterval(intervalId);
         }
       } catch (err: any) {
@@ -244,13 +251,18 @@ export default function TestView() {
                       <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     </div>
                     <div className="flex-1 bg-white rounded px-3 py-1 text-sm text-gray-600 ml-4">
-                      Waiting for recording...
+                      <span className="text-orange-600">●</span> Processing recording...
                     </div>
                   </div>
                   <div className="relative bg-gray-900 flex items-center justify-center" style={{ height: '600px' }}>
                     <div className="text-center text-white">
-                      <p className="text-lg mb-2">Recording not yet available</p>
-                      <p className="text-sm text-gray-400">Please wait for the session to complete</p>
+                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                      <p className="text-lg mb-2">Processing session recording...</p>
+                      <p className="text-sm text-gray-400">
+                        {isTestComplete
+                          ? 'Browserbase is processing the recording. This may take up to 30 seconds.'
+                          : 'Please wait for the session to complete'}
+                      </p>
                     </div>
                   </div>
                 </div>

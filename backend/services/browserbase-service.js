@@ -149,16 +149,34 @@ export async function getSessionStatus(sessionId) {
 }
 
 /**
- * Get the recording URL for a completed session
+ * Get the recording URL for a completed session with retry logic
  * @param {string} sessionId - The Browserbase session ID
+ * @param {number} maxRetries - Maximum number of retries
+ * @param {number} retryDelay - Delay between retries in milliseconds
  * @returns {Promise<string|null>}
  */
-export async function getRecordingUrl(sessionId) {
-  try {
-    const session = await browserbase.sessions.retrieve(sessionId);
-    return session.recordingUrl || null;
-  } catch (error) {
-    console.error('❌ Failed to get recording URL:', error);
-    return null;
+export async function getRecordingUrl(sessionId, maxRetries = 10, retryDelay = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const session = await browserbase.sessions.retrieve(sessionId);
+
+      if (session.recordingUrl) {
+        console.log(`✅ Recording URL retrieved on attempt ${attempt}:`, session.recordingUrl);
+        return session.recordingUrl;
+      }
+
+      if (attempt < maxRetries) {
+        console.log(`⏳ Recording URL not ready yet (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    } catch (error) {
+      console.error(`❌ Failed to get recording URL (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
   }
+
+  console.warn('⚠️  Recording URL not available after all retries');
+  return null;
 }
