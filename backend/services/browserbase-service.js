@@ -155,14 +155,33 @@ export async function getSessionStatus(sessionId) {
  * @param {number} retryDelay - Delay between retries in milliseconds
  * @returns {Promise<string|null>}
  */
-export async function getRecordingUrl(sessionId, maxRetries = 10, retryDelay = 3000) {
+export async function getRecordingUrl(sessionId, maxRetries = 5, retryDelay = 2000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const session = await browserbase.sessions.retrieve(sessionId);
 
-      if (session.recordingUrl) {
-        console.log(`✅ Recording URL retrieved on attempt ${attempt}:`, session.recordingUrl);
-        return session.recordingUrl;
+      // Log session details on first attempt to debug
+      if (attempt === 1) {
+        console.log('📋 Session object keys:', Object.keys(session));
+        console.log('📋 Session status:', session.status);
+        console.log('📋 Session recording fields:', {
+          recordingUrl: session.recordingUrl,
+          recordingUrls: session.recordingUrls,
+          recording: session.recording,
+          videoUrl: session.videoUrl,
+          videoUrls: session.videoUrls,
+        });
+      }
+
+      // Check various possible recording URL fields
+      const recordingUrl = session.recordingUrl ||
+                          session.recordingUrls?.video ||
+                          session.recording?.url ||
+                          session.videoUrl;
+
+      if (recordingUrl) {
+        console.log(`✅ Recording URL retrieved on attempt ${attempt}:`, recordingUrl);
+        return recordingUrl;
       }
 
       if (attempt < maxRetries) {

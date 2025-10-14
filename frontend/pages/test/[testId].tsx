@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import LiveBrowserView from '@/components/LiveBrowserView';
 import { getTestStatus, stopTest } from '@/lib/api';
 import type { TestStatus } from '@/lib/api';
 
@@ -181,89 +182,35 @@ export default function TestView() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Session Video Player */}
+            {/* Live Browser View */}
             <div className="lg:col-span-2">
-              {isTestComplete && testData.recordingUrl ? (
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                  {/* Browser Header */}
-                  <div className="bg-gray-100 border-b border-gray-300 px-4 py-3 flex items-center space-x-2">
-                    <div className="flex space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    </div>
-                    <div className="flex-1 bg-white rounded px-3 py-1 text-sm text-gray-600 ml-4">
-                      Session Recording: {testData.browserbaseSessionId?.substring(0, 8)}...
-                    </div>
-                  </div>
+              {testData.browserbaseSessionId && (
+                <LiveBrowserView
+                  liveViewUrl={`https://www.browserbase.com/sessions/${testData.browserbaseSessionId}`}
+                  sessionId={testData.browserbaseSessionId}
+                />
+              )}
 
-                  {/* Video Player */}
-                  <div className="relative bg-gray-900" style={{ height: '600px' }}>
-                    <video
-                      src={testData.recordingUrl}
-                      controls
-                      className="w-full h-full"
-                      style={{ objectFit: 'contain' }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  </div>
-
-                  {/* Browser Footer */}
-                  <div className="bg-gray-100 border-t border-gray-300 px-4 py-2 text-xs text-gray-600 flex items-center justify-between">
-                    <span>Session Recording - Powered by Browserbase</span>
+              {/* Recording Video Link - Show after test completes */}
+              {isTestComplete && testData.recordingUrl && (
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-green-900 mb-1">Session Recording Ready!</h3>
+                      <p className="text-sm text-green-700">Click the button below to watch the session recording</p>
+                    </div>
                     <a
                       href={testData.recordingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 hover:underline"
+                      className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold"
                     >
-                      Download video →
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Watch Recording
                     </a>
-                  </div>
-                </div>
-              ) : isTestRunning ? (
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                  <div className="bg-gray-100 border-b border-gray-300 px-4 py-3 flex items-center space-x-2">
-                    <div className="flex space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    </div>
-                    <div className="flex-1 bg-white rounded px-3 py-1 text-sm text-gray-600 ml-4">
-                      <span className="text-green-600">●</span> Test in Progress
-                    </div>
-                  </div>
-                  <div className="relative bg-gray-900 flex items-center justify-center" style={{ height: '600px' }}>
-                    <div className="text-center text-white">
-                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-                      <p className="text-lg mb-2">Test is running...</p>
-                      <p className="text-sm text-gray-400">Recording will be available once the test completes</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                  <div className="bg-gray-100 border-b border-gray-300 px-4 py-3 flex items-center space-x-2">
-                    <div className="flex space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    </div>
-                    <div className="flex-1 bg-white rounded px-3 py-1 text-sm text-gray-600 ml-4">
-                      <span className="text-orange-600">●</span> Processing recording...
-                    </div>
-                  </div>
-                  <div className="relative bg-gray-900 flex items-center justify-center" style={{ height: '600px' }}>
-                    <div className="text-center text-white">
-                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-                      <p className="text-lg mb-2">Processing session recording...</p>
-                      <p className="text-sm text-gray-400">
-                        {isTestComplete
-                          ? 'Browserbase is processing the recording. This may take up to 30 seconds.'
-                          : 'Please wait for the session to complete'}
-                      </p>
-                    </div>
                   </div>
                 </div>
               )}

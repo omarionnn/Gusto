@@ -225,7 +225,7 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
       });
     }
 
-    // Create a simple action log
+    // Create action logs array
     const actionLogs = [{
       timestamp: new Date().toISOString(),
       action: { action: 'navigate', reasoning: 'Initial navigation to target URL' },
@@ -236,8 +236,30 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     // Save action log to database
     saveActionLog(testId, actionLogs[0]);
 
+    // Scroll down slowly for 3 seconds
+    console.log(`📜 Scrolling page for 3 seconds...`);
+    const scrollDuration = 3000; // 3 seconds
+    const scrollSteps = 30; // 30 steps
+    const scrollAmount = 50; // pixels per step
+    const stepDelay = scrollDuration / scrollSteps;
+
+    for (let i = 0; i < scrollSteps; i++) {
+      await page.evaluate((amount) => window.scrollBy(0, amount), scrollAmount);
+      await page.waitForTimeout(stepDelay);
+    }
+
+    // Add scroll action to logs
+    actionLogs.push({
+      timestamp: new Date().toISOString(),
+      action: { action: 'scroll', reasoning: 'Scroll through page content' },
+      result: { success: true, message: 'Scrolled through page for 3 seconds' },
+      context: { url: page.url(), title: await page.title() },
+    });
+
+    saveActionLog(testId, actionLogs[1]);
+
     console.log(`✅ Test completed: ${testId}`);
-    console.log(`   Website is loaded and viewable`);
+    console.log(`   Website loaded and scrolled`);
 
     // Close the browser and end the session
     console.log(`🔄 Closing browser and ending session...`);
@@ -358,6 +380,55 @@ router.get('/:testId/status', async (req, res) => {
     console.error('❌ Failed to get test status:', error);
     res.status(500).json({
       error: 'Failed to get test status',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/test/:testId/recording
+ * Get the recording URL for a test (with retry logic)
+ */
+router.get('/:testId/recording', async (req, res) => {
+  try {
+    const { testId } = req.params;
+
+    // Check if test exists
+    const test = getTest(testId);
+    if (!test) {
+      return res.status(404).json({
+        error: 'Test not found',
+        message: `No test found with ID: ${testId}`,
+      });
+    }
+
+    if (!test.browserbase_session_id) {
+      return res.status(400).json({
+        error: 'No session ID',
+        message: 'Test does not have a Browserbase session ID',
+      });
+    }
+
+    // Try to get recording URL with retries
+    const { getRecordingUrl } = await import('../services/browserbase-service.js');
+    const recordingUrl = await getRecordingUrl(test.browserbase_session_id);
+
+    if (!recordingUrl) {
+      return res.status(404).json({
+        error: 'Recording not available',
+        message: 'Session recording is not yet available. Please try again in a few moments.',
+      });
+    }
+
+    res.json({
+      testId,
+      sessionId: test.browserbase_session_id,
+      recordingUrl,
+    });
+  } catch (error) {
+    console.error('❌ Failed to get recording URL:', error);
+    res.status(500).json({
+      error: 'Failed to get recording URL',
       message: error.message,
     });
   }
