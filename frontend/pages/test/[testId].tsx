@@ -2,7 +2,6 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import LiveBrowserView from '@/components/LiveBrowserView';
 import { getTestStatus, stopTest } from '@/lib/api';
 import type { TestStatus } from '@/lib/api';
 
@@ -182,38 +181,67 @@ export default function TestView() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Live Browser View */}
+            {/* Test Status and Recording */}
             <div className="lg:col-span-2">
-              {testData.browserbaseSessionId && (
-                <LiveBrowserView
-                  liveViewUrl={`https://www.browserbase.com/sessions/${testData.browserbaseSessionId}`}
-                  sessionId={testData.browserbaseSessionId}
-                />
-              )}
-
-              {/* Recording Video Link - Show after test completes */}
-              {isTestComplete && testData.recordingUrl && (
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-green-900 mb-1">Session Recording Ready!</h3>
-                      <p className="text-sm text-green-700">Click the button below to watch the session recording</p>
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                {isTestRunning ? (
+                  <div className="text-center py-12">
+                    <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-6"></div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Test in Progress</h2>
+                    <p className="text-gray-600 mb-4">
+                      Navigating to website and scrolling...
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Session ID: {testData.browserbaseSessionId?.substring(0, 16)}...
+                    </p>
+                  </div>
+                ) : isTestComplete && testData.recordingUrl ? (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6">
+                      <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
                     </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Test Complete!</h2>
+                    <p className="text-gray-600 mb-6">
+                      Your session recording is ready to view
+                    </p>
                     <a
                       href={testData.recordingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold"
+                      className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-lg transition-colors"
                     >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Watch Recording
+                      Watch Session Recording
                     </a>
+                    <p className="text-sm text-gray-500 mt-4">
+                      Session ID: {testData.browserbaseSessionId?.substring(0, 16)}...
+                    </p>
                   </div>
-                </div>
-              )}
+                ) : isTestComplete ? (
+                  <div className="text-center py-12">
+                    <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-orange-600 mb-6"></div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Processing Recording...</h2>
+                    <p className="text-gray-600 mb-4">
+                      Please wait while we generate your session recording
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      This usually takes about 10 seconds
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Test Status</h2>
+                    <p className="text-gray-600">
+                      Status: {testData.status}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Progress Panel */}
