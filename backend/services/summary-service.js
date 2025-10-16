@@ -1,8 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Lazy initialization - create client when first needed (after env vars are loaded)
+let anthropic = null;
+
+function getAnthropicClient() {
+  if (!anthropic) {
+    anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+  }
+  return anthropic;
+}
 
 /**
  * Generate a comprehensive website summary using Claude's vision API
@@ -45,8 +53,11 @@ Provide a structured, detailed analysis that would be useful for developers, des
 
 Provide a comprehensive summary of the website's appearance, design, and user experience.`;
 
+    // Get Anthropic client (lazy initialization)
+    const client = getAnthropicClient();
+
     // Create message with all screenshots
-    const message = await anthropic.messages.create({
+    const message = await client.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 2048,
       messages: [
@@ -90,7 +101,10 @@ export async function generateQuickSummary(screenshot, metadata) {
   try {
     const { url, title } = metadata;
 
-    const message = await anthropic.messages.create({
+    // Get Anthropic client (lazy initialization)
+    const client = getAnthropicClient();
+
+    const message = await client.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 512,
       messages: [

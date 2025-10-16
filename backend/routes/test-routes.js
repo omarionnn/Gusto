@@ -210,8 +210,11 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     // Set viewport size
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    // Navigate to the website
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Navigate to the website and wait for page to stabilize
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+
+    // Additional wait for dynamic content to render
+    await page.waitForTimeout(2000);
 
     console.log(`✅ Successfully loaded: ${url}`);
     console.log(`📺 Live view available at: https://browserbase.com/sessions/${browserbaseSessionId}`);

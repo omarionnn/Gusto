@@ -115,6 +115,7 @@ export async function endSession(sessionId, browser = null) {
     // Stop the session on Browserbase (use update, not complete)
     try {
       await browserbase.sessions.update(sessionId, {
+        projectId: process.env.BROWSERBASE_PROJECT_ID,
         status: 'REQUEST_RELEASE',
       });
       console.log('✅ Ended Browserbase session:', sessionId);
