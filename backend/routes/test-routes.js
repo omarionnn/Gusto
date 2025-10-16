@@ -236,11 +236,20 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     // Save action log to database
     saveActionLog(testId, actionLogs[0]);
 
-    // Scroll down slowly for 3 seconds
-    console.log(`📜 Scrolling page for 3 seconds...`);
-    const scrollDuration = 3000; // 3 seconds
-    const scrollSteps = 30; // 30 steps
-    const scrollAmount = 50; // pixels per step
+    // Scroll to bottom of page smoothly
+    console.log(`📜 Scrolling to bottom of page...`);
+
+    // Get page height
+    const pageHeight = await page.evaluate(() => document.body.scrollHeight);
+    const viewportHeight = await page.evaluate(() => window.innerHeight);
+    const totalScrollDistance = pageHeight - viewportHeight;
+
+    console.log(`📏 Page height: ${pageHeight}px, Viewport: ${viewportHeight}px, Scroll distance: ${totalScrollDistance}px`);
+
+    // Scroll smoothly to bottom
+    const scrollDuration = 5000; // 5 seconds to scroll
+    const scrollSteps = 50; // More steps for smoother scrolling
+    const scrollAmount = Math.ceil(totalScrollDistance / scrollSteps);
     const stepDelay = scrollDuration / scrollSteps;
 
     for (let i = 0; i < scrollSteps; i++) {
@@ -248,11 +257,18 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
       await page.waitForTimeout(stepDelay);
     }
 
+    // Final scroll to ensure we're at the bottom
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(500);
+
+    const finalScrollPosition = await page.evaluate(() => window.scrollY);
+    console.log(`✅ Scrolled to position: ${finalScrollPosition}px`);
+
     // Add scroll action to logs
     actionLogs.push({
       timestamp: new Date().toISOString(),
-      action: { action: 'scroll', reasoning: 'Scroll through page content' },
-      result: { success: true, message: 'Scrolled through page for 3 seconds' },
+      action: { action: 'scroll', reasoning: 'Scroll to bottom of page' },
+      result: { success: true, message: `Scrolled to bottom of page (${finalScrollPosition}px)` },
       context: { url: page.url(), title: await page.title() },
     });
 

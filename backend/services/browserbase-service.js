@@ -9,9 +9,13 @@ export async function createSession() {
   try {
     const session = await browserbase.sessions.create({
       projectId: process.env.BROWSERBASE_PROJECT_ID,
+      browserSettings: {
+        recordSession: true,  // Enable session recording
+      },
     });
 
     console.log('✅ Created Browserbase session:', session.id);
+    console.log('📹 Session recording enabled');
 
     return {
       sessionId: session.id,
@@ -140,7 +144,7 @@ export async function getSessionStatus(sessionId) {
       projectId: session.projectId,
       liveViewUrl: session.liveUrls?.liveUrl,
       debugUrl: session.debugUrl,
-      recordingUrl: session.recordingUrl,
+      recordingUrl: `https://browserbase.com/sessions/${sessionId}`,
     };
   } catch (error) {
     console.error('❌ Failed to get session status:', error);
@@ -149,53 +153,48 @@ export async function getSessionStatus(sessionId) {
 }
 
 /**
- * Get the recording URL for a completed session with retry logic
+ * Get the recording URL for a completed session
+ * Browserbase recordings are available at: https://browserbase.com/sessions/{sessionId}
  * @param {string} sessionId - The Browserbase session ID
- * @param {number} maxRetries - Maximum number of retries
+ * @param {number} maxRetries - Maximum number of retries to check if session is completed
  * @param {number} retryDelay - Delay between retries in milliseconds
  * @returns {Promise<string|null>}
  */
 export async function getRecordingUrl(sessionId, maxRetries = 5, retryDelay = 2000) {
+  // Browserbase recordings are accessible via a simple URL pattern
+  // The recording becomes available after the session is completed
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const session = await browserbase.sessions.retrieve(sessionId);
 
       // Log session details on first attempt to debug
       if (attempt === 1) {
-        console.log('📋 Session object keys:', Object.keys(session));
         console.log('📋 Session status:', session.status);
-        console.log('📋 Session recording fields:', {
-          recordingUrl: session.recordingUrl,
-          recordingUrls: session.recordingUrls,
-          recording: session.recording,
-          videoUrl: session.videoUrl,
-          videoUrls: session.videoUrls,
-        });
       }
 
-      // Check various possible recording URL fields
-      const recordingUrl = session.recordingUrl ||
-                          session.recordingUrls?.video ||
-                          session.recording?.url ||
-                          session.videoUrl;
-
-      if (recordingUrl) {
-        console.log(`✅ Recording URL retrieved on attempt ${attempt}:`, recordingUrl);
+      // Check if session is completed (recording should be available)
+      if (session.status === 'COMPLETED' || session.endedAt) {
+        const recordingUrl = `https://browserbase.com/sessions/${sessionId}`;
+        console.log(`✅ Recording URL available:`, recordingUrl);
         return recordingUrl;
       }
 
       if (attempt < maxRetries) {
-        console.log(`⏳ Recording URL not ready yet (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
+        console.log(`⏳ Session not completed yet (status: ${session.status}, attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     } catch (error) {
-      console.error(`❌ Failed to get recording URL (attempt ${attempt}/${maxRetries}):`, error);
+      console.error(`❌ Failed to get session status (attempt ${attempt}/${maxRetries}):`, error);
       if (attempt < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
   }
 
-  console.warn('⚠️  Recording URL not available after all retries');
-  return null;
+  // Even if session is not marked as completed, return the URL anyway
+  // The recording might still be available
+  const recordingUrl = `https://browserbase.com/sessions/${sessionId}`;
+  console.log('⚠️  Session not completed after retries, but recording may still be available at:', recordingUrl);
+  return recordingUrl;
 }
