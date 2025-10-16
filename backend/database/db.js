@@ -73,6 +73,25 @@ export function initializeDatabase() {
     )
   `);
 
+  // Create screenshots table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS screenshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      test_id TEXT NOT NULL,
+      screenshot_data TEXT NOT NULL,
+      position TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Add summary column to reports table if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE reports ADD COLUMN summary TEXT`);
+  } catch (error) {
+    // Column might already exist, ignore error
+  }
+
   console.log('✅ Database initialized successfully');
   console.log(`📁 Database location: ${dbPath}`);
 }
@@ -221,6 +240,50 @@ export function getReport(testId) {
 export function deleteTest(testId) {
   const stmt = db.prepare('DELETE FROM tests WHERE id = ?');
   return stmt.run(testId);
+}
+
+/**
+ * Save a screenshot
+ */
+export function saveScreenshot(testId, screenshotData, position) {
+  const stmt = db.prepare(`
+    INSERT INTO screenshots (test_id, screenshot_data, position, timestamp)
+    VALUES (?, ?, ?, datetime('now'))
+  `);
+
+  // Convert buffer to base64 string
+  const base64Data = screenshotData.toString('base64');
+  return stmt.run(testId, base64Data, position);
+}
+
+/**
+ * Get screenshots for a test
+ */
+export function getScreenshots(testId) {
+  const stmt = db.prepare(`
+    SELECT * FROM screenshots
+    WHERE test_id = ?
+    ORDER BY timestamp ASC
+  `);
+  const screenshots = stmt.all(testId);
+
+  // Convert base64 strings back to buffers
+  return screenshots.map(screenshot => ({
+    ...screenshot,
+    data: Buffer.from(screenshot.screenshot_data, 'base64'),
+  }));
+}
+
+/**
+ * Update report with summary
+ */
+export function updateReportSummary(testId, summary) {
+  const stmt = db.prepare(`
+    UPDATE reports
+    SET summary = ?
+    WHERE test_id = ?
+  `);
+  return stmt.run(JSON.stringify(summary), testId);
 }
 
 export default db;

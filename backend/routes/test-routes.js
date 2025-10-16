@@ -3,7 +3,8 @@ import { randomUUID } from 'crypto';
 import { createSession, connectPlaywright, endSession } from '../services/browserbase-service.js';
 import { testWebsite } from '../services/agent-service.js';
 import { generateReport, getTestReport } from '../services/report-service.js';
-import { createTest, updateTestStatus, getTest, getAllTests, saveActionLog } from '../database/db.js';
+import { createTest, updateTestStatus, getTest, getAllTests, saveActionLog, saveScreenshot, getScreenshots } from '../database/db.js';
+import { generateWebsiteSummary } from '../services/summary-service.js';
 
 const router = express.Router();
 
@@ -236,7 +237,15 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     // Save action log to database
     saveActionLog(testId, actionLogs[0]);
 
-    // Scroll to bottom of page smoothly
+    // Capture screenshots at key positions
+    console.log(`📸 Capturing screenshots...`);
+
+    // Screenshot 1: Top of page
+    console.log(`📸 Capturing screenshot at top of page...`);
+    const screenshotTop = await page.screenshot({ type: 'png', fullPage: false });
+    saveScreenshot(testId, screenshotTop, 'top');
+
+    // Scroll to bottom of page smoothly with screenshots
     console.log(`📜 Scrolling to bottom of page...`);
 
     // Get page height
@@ -246,10 +255,20 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
 
     console.log(`📏 Page height: ${pageHeight}px, Viewport: ${viewportHeight}px, Scroll distance: ${totalScrollDistance}px`);
 
-    // Scroll smoothly to bottom
+    // Scroll smoothly to middle and capture screenshot
+    const middleScrollDistance = totalScrollDistance / 2;
+    await page.evaluate((distance) => window.scrollTo(0, distance), middleScrollDistance);
+    await page.waitForTimeout(1000); // Wait for page to settle
+
+    // Screenshot 2: Middle of page
+    console.log(`📸 Capturing screenshot at middle of page...`);
+    const screenshotMiddle = await page.screenshot({ type: 'png', fullPage: false });
+    saveScreenshot(testId, screenshotMiddle, 'middle');
+
+    // Continue scrolling to bottom
     const scrollDuration = 5000; // 5 seconds to scroll
     const scrollSteps = 50; // More steps for smoother scrolling
-    const scrollAmount = Math.ceil(totalScrollDistance / scrollSteps);
+    const scrollAmount = Math.ceil((totalScrollDistance - middleScrollDistance) / scrollSteps);
     const stepDelay = scrollDuration / scrollSteps;
 
     for (let i = 0; i < scrollSteps; i++) {
@@ -264,6 +283,13 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     const finalScrollPosition = await page.evaluate(() => window.scrollY);
     console.log(`✅ Scrolled to position: ${finalScrollPosition}px`);
 
+    // Screenshot 3: Bottom of page
+    console.log(`📸 Capturing screenshot at bottom of page...`);
+    const screenshotBottom = await page.screenshot({ type: 'png', fullPage: false });
+    saveScreenshot(testId, screenshotBottom, 'bottom');
+
+    console.log(`✅ Captured 3 screenshots (top, middle, bottom)`);
+
     // Add scroll action to logs
     actionLogs.push({
       timestamp: new Date().toISOString(),
@@ -277,6 +303,9 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     console.log(`✅ Test completed: ${testId}`);
     console.log(`   Website loaded and scrolled`);
 
+    // Get page title before closing browser
+    const pageTitle = await page.title();
+
     // Close the browser and end the session
     console.log(`🔄 Closing browser and ending session...`);
     await endSession(browserbaseSessionId, browser);
@@ -284,6 +313,26 @@ async function runTestInBackground(testId, url, browserbaseSessionId) {
     // Generate report with recording URL (includes retry logic)
     console.log(`⏳ Fetching session recording URL...`);
     const report = await generateReport(testId, actionLogs, browserbaseSessionId);
+
+    // Generate AI summary from screenshots
+    console.log(`🤖 Generating AI website summary...`);
+    try {
+      const screenshots = getScreenshots(testId);
+      const summary = await generateWebsiteSummary(screenshots, {
+        url,
+        title: pageTitle,
+        viewport: { width: 1280, height: 720 },
+      });
+
+      // Update report with summary
+      const { updateReportSummary } = await import('../database/db.js');
+      updateReportSummary(testId, summary);
+
+      console.log(`✅ AI summary generated successfully`);
+    } catch (summaryError) {
+      console.error(`⚠️  Failed to generate AI summary:`, summaryError.message);
+      // Continue even if summary generation fails
+    }
 
     // Update status to completed
     updateTestStatus(testId, 'completed');
@@ -567,6 +616,61 @@ router.get('/list', async (req, res) => {
     console.error('❌ Failed to get tests:', error);
     res.status(500).json({
       error: 'Failed to get tests',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/test/:testId/summary
+ * Get the AI-generated summary for a test
+ */
+router.get('/:testId/summary', async (req, res) => {
+  try {
+    const { testId } = req.params;
+
+    // Check if test exists
+    const test = getTest(testId);
+    if (!test) {
+      return res.status(404).json({
+        error: 'Test not found',
+        message: `No test found with ID: ${testId}`,
+      });
+    }
+
+    // Check if test is completed
+    if (test.status !== 'completed') {
+      return res.status(400).json({
+        error: 'Test not completed',
+        message: `Test is currently ${test.status}. Summaries are only available for completed tests.`,
+        status: test.status,
+      });
+    }
+
+    // Get report with summary
+    const { getReport } = await import('../database/db.js');
+    const report = getReport(testId);
+
+    if (!report || !report.summary) {
+      return res.status(404).json({
+        error: 'Summary not found',
+        message: 'No AI summary available for this test',
+      });
+    }
+
+    const summary = JSON.parse(report.summary);
+
+    res.json({
+      testId,
+      summary: summary.summary,
+      screenshotCount: summary.screenshotCount,
+      generatedAt: summary.generatedAt,
+      model: summary.model,
+    });
+  } catch (error) {
+    console.error('❌ Failed to get test summary:', error);
+    res.status(500).json({
+      error: 'Failed to get test summary',
       message: error.message,
     });
   }

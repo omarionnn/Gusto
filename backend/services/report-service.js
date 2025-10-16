@@ -129,7 +129,17 @@ export function getTestReport(testId) {
       return null;
     }
 
-    return report.data;
+    // Include AI summary if available
+    const reportData = report.data;
+    if (report.summary) {
+      try {
+        reportData.aiSummary = JSON.parse(report.summary);
+      } catch (parseError) {
+        console.warn('Failed to parse AI summary:', parseError);
+      }
+    }
+
+    return reportData;
   } catch (error) {
     console.error('❌ Failed to get report:', error);
     throw new Error(`Failed to retrieve report: ${error.message}`);
